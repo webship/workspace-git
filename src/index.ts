@@ -18,7 +18,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { ActionContext, PluginApi, RowContext } from '@webship/workspace-plugin-api';
+import type { ActionContext, PluginApi, RowContext } from '@webship.co/workspace-plugin-api';
 
 export const GIT_RUN_ACTIONS: Record<string, { label: string; args: string[] }> = {
   status:   { label: 'git status',        args: ['status'] },

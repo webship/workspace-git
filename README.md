@@ -1,4 +1,4 @@
-# @webship/workspace-git
+# @webship.co/workspace-git
 
 Git for the [Webship Workspace](https://github.com/webship/workspace) dashboard: the **GIT** menu on
 every project row. The read-only commands (status, log, diff, branches, remotes, stashes) run in a

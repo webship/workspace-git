@@ -1,13 +1,20 @@
 {
-  "name": "@webship/workspace-git",
-  "version": "1.0.0",
+  "name": "@webship.co/workspace-git",
+  "version": "1.0.0-alpha1",
   "description": "Git for Webship Workspace: the GIT menu on every project row (the read-only commands as lingering terminal sessions, the mutating ones to copy, git init where there is no repository) and the filemode command in the site workspaces.",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
-  "private": true,
   "license": "ISC",
-  "repository": "github:webship/workspace-git",
-  "files": ["dist/src", "commands", "features", "README.md"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webship/workspace-git.git"
+  },
+  "files": [
+    "dist/src",
+    "commands",
+    "features",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepare": "npm run build",
@@ -17,12 +24,28 @@
   "workspacePlugin": {
     "name": "git",
     "label": "Git",
-    "commands": { "workspaces": ["dev", "test", "sandboxes", "projects", "products"], "files": ["commands/cmd-tools-git-change-filemode-to-false.sh"] },
-    "features": ["features/git.feature"]
+    "commands": {
+      "workspaces": [
+        "dev",
+        "test",
+        "sandboxes",
+        "projects",
+        "products"
+      ],
+      "files": [
+        "commands/cmd-tools-git-change-filemode-to-false.sh"
+      ]
+    },
+    "features": [
+      "features/git.feature"
+    ]
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@webship/workspace-plugin-api": "github:webship/workspace-plugin-api#1.0.x",
+    "@webship.co/workspace-plugin-api": "^1.0.0-alpha1",
     "typescript": "^5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

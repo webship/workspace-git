@@ -17,7 +17,7 @@ const MUTATING = /\b(push|pull|fetch|commit|add|reset|checkout|switch|merge|reba
 const lingerTail = (label: string) => `echo "${label} finished. Press Enter to close this session"; read -r _`;
 
 function fakeApi(root: string) {
-  const calls: any = { rowMenus: {}, actions: {}, started: [], stopped: [] };
+  const calls: any = { rowMenus: {}, actions: {}, fragments: [], started: [], stopped: [] };
   const api: any = {
     name: 'git', config: {}, settings: { read: () => ({}) },
     lib: {
@@ -31,6 +31,7 @@ function fakeApi(root: string) {
     },
     addRowMenu: (slot: string, spec: any, fn: any) => { calls.rowMenus[slot] = { spec, fn }; },
     addAction: (name: string, fn: any) => { calls.actions[name] = fn; },
+    addFragment: (fn: any) => calls.fragments.push(fn),
   };
   return { api, calls };
 }
@@ -124,4 +125,32 @@ test('a session still open from last time is stopped and replaced; the command l
   assert.strictEqual(calls.started.length, 2);
   assert.match(out, /open the output/);
   assert.match(gitScreenCommand(lingerTail, 'git log', ['log']), /Press Enter to close this session/);
+});
+
+test('on a dashboard that fetches menu bodies, the row carries the button and the caption and the fragment serves the body', () => {
+  const root = tree();
+  const { api, calls } = fakeApi(root);
+  api.capabilities = new Set(['row-menu-body']);
+  register(api);
+  const ctx = (p: string) => ({ key: 'dev', project: p, dir: path.join(root, 'dev'), meta: {}, allowed: new Set(), vals: () => '' });
+  const repo = calls.rowMenus.git.fn(ctx('repo'));
+  assert.strictEqual(repo.body, '/fragments/p/git/menu/dev/repo');
+  assert.strictEqual(repo.caption, '2 changed');
+  assert.match(repo.html, /title="Git on main"/);
+  assert.doesNotMatch(repo.html, /uk-dropdown|hx-post/, 'the page carries the button alone');
+  assert.strictEqual(calls.rowMenus.git.fn(ctx('plain')).caption, 'no repo');
+  let out = { html: '', status: 200 };
+  const send = (html: string, status = 200) => { out = { html, status }; };
+  calls.fragments[0]({ send, rest: 'menu/dev/repo' });
+  assert.strictEqual(out.status, 200);
+  assert.match(out.html, /^<ul class="uk-nav uk-dropdown-nav">/);
+  assert.match(out.html, /Git · main/);
+  assert.match(out.html, /hx-post="\/actions\/p\/git\/run"[^>]*"cmd":"status"/);
+  assert.match(out.html, /hx-vals=.\{"workspace":"dev","projectName":"repo","cmd":"log"\}. hx-target="#webship-workspace-output"/, 'the items post for this project into the output');
+  calls.fragments[0]({ send, rest: 'menu/dev/plain' });
+  assert.match(out.html, /Not a git repository yet/);
+  calls.fragments[0]({ send, rest: 'menu/dev/missing' });
+  assert.strictEqual(out.status, 404);
+  calls.fragments[0]({ send, rest: 'something-else' });
+  assert.strictEqual(out.status, 404);
 });

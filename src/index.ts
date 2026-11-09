@@ -18,7 +18,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { ActionContext, PluginApi, RowContext } from '@webship.co/workspace-plugin-api';
+import type { ActionContext, FragmentContext, PluginApi, RowContext } from '@webship.co/workspace-plugin-api';
 
 export const GIT_RUN_ACTIONS: Record<string, { label: string; args: string[] }> = {
   status:   { label: 'git status',        args: ['status'] },
@@ -60,25 +60,39 @@ export function register(api: PluginApi): void {
   const { esc, workspaceDir, NAME_RE, hasOwnGit, gitWorktreeInfo, tildePath, lingerTail, startInScreen, screenStartedHtml, hostRunnerRequest } = api.lib as any;
   const post = (name: string) => `/actions/p/${api.name}/${name}`;
 
-  api.addRowMenu('git', { label: 'GIT', row: 0 }, ({ key, project: p, dir }: RowContext) => {
-    const projectPath = path.join(dir, p);
-    const vals = (extra = '') => `hx-vals='{"workspace":"${esc(key)}","projectName":"${esc(p)}"${extra}}' hx-target="#webship-workspace-output" hx-swap="innerHTML"`;
-    const button = (title: string) => `<button class="uk-button uk-button-default uk-button-small" type="button" title="${esc(title)}"><span uk-icon="icon: git-branch; ratio: .7"></span> GIT <span uk-icon="icon: chevron-down; ratio: .6"></span></button>`;
-    // The folder's OWN .git decides, not git's rev-parse: a subfolder of a parent repository would
-    // otherwise be offered that parent's history as if it were its own.
-    const g = hasOwnGit(projectPath) ? gitWorktreeInfo(projectPath) : null;
-    if (!g || g.role === 'none') {
-      return `<span class="act-with-status"><div class="uk-inline act-menu act-menu-git">
-        ${button('No git repository in this folder yet')}
-        <div uk-dropdown="mode: click; pos: bottom-right"><ul class="uk-nav uk-dropdown-nav">
+  // ---- The GIT menu on a project row -------------------------------------------------------------
+
+  const fragment = (rest: string) => `/fragments/p/${api.name}/${rest}`;
+  // A dashboard since 1.0.0-rc2 fetches a row menu's body when the menu opens (`row-menu-body`): the
+  // page carries the button and the caption, and gitMenuBody() answers from the fragment below, for
+  // that one folder. An older dashboard gets the whole menu inline, as it always did.
+  const lazy = !!(api.capabilities && api.capabilities.has('row-menu-body'));
+  const gitButton = (title: string) => `<button class="uk-button uk-button-default uk-button-small" type="button" title="${esc(title)}"><span uk-icon="icon: git-branch; ratio: .7"></span> GIT <span uk-icon="icon: chevron-down; ratio: .6"></span></button>`;
+  const rowVals = (key: string, p: string) => (extra = '') => `hx-vals='{"workspace":"${esc(key)}","projectName":"${esc(p)}"${extra}}' hx-target="#webship-workspace-output" hx-swap="innerHTML"`;
+
+  /**
+   * What the folder's OWN .git says (not git's rev-parse: a subfolder of a parent repository would
+   * otherwise be offered that parent's history as if it were its own), and the words the row shows.
+   */
+  function gitMenuState(projectPath: string) {
+    const info = hasOwnGit(projectPath) ? gitWorktreeInfo(projectPath) : null;
+    const g = info && info.role !== 'none' ? info : null;
+    const caption = !g ? 'no repo' : (g.dirty ? `${g.dirty} changed` : (g.unpushed ? `${g.unpushed} unpushed` : 'clean'));
+    const title = !g ? 'No git repository in this folder yet' : `Git on ${g.branch || 'a detached HEAD'}`;
+    return { g, caption, title };
+  }
+
+  /** The dropdown's inner HTML for one folder: the commands on a repository, git init otherwise. */
+  function gitMenuBody(key: string, p: string, projectPath: string, g: ReturnType<typeof gitWorktreeInfo> | null): string {
+    const vals = rowVals(key, p);
+    if (!g) {
+      return `<ul class="uk-nav uk-dropdown-nav">
           <li class="uk-nav-header">Not a git repository yet</li>
           <li><a href hx-post="${post('init')}" ${vals()}><span uk-icon="icon: plus-circle; ratio: .7"></span> git init — start a repository here</a></li>
           <li><span class="uk-text-meta">The common commands appear once this folder has its own .git.</span></li>
-        </ul></div>
-      </div><span class="act-status uk-text-meta">no repo</span></span>`;
+        </ul>`;
     }
     const cdPath = tildePath(projectPath);
-    const caption = g.dirty ? `${g.dirty} changed` : (g.unpushed ? `${g.unpushed} unpushed` : 'clean');
     const facts = [
       g.role === 'linked' ? `a worktree of ${tildePath(g.primary)}` : '',
       g.role === 'primary' ? `${g.others.length} worktree(s) live off this checkout` : '',
@@ -91,9 +105,7 @@ export function register(api: PluginApi): void {
       const line = `cd ${cdPath} && ${c.line}`;
       return `<li><a href="#" class="copy-cmd" data-copy="${esc(line)}" title="Copy: ${esc(line)}"><span uk-icon="icon: copy; ratio: .7"></span> ${esc(c.label)}</a></li>`;
     }).join('');
-    return `<span class="act-with-status"><div class="uk-inline act-menu act-menu-git">
-      ${button(`Git on ${g.branch || 'a detached HEAD'}`)}
-      <div uk-dropdown="mode: click; pos: bottom-right"><ul class="uk-nav uk-dropdown-nav">
+    return `<ul class="uk-nav uk-dropdown-nav">
         <li class="uk-nav-header">${g.role === 'linked' ? 'Git worktree' : 'Git'} · ${esc(g.branch || 'detached HEAD')}${g.unborn ? ' · no commits yet' : ''}</li>
         ${facts.length ? `<li data-entry="facts"><span class="uk-text-meta">${esc(facts.join(' · '))}</span></li>` : ''}
         <li class="uk-nav-divider"></li>
@@ -102,8 +114,28 @@ export function register(api: PluginApi): void {
         <li class="uk-nav-divider"></li>
         <li class="uk-nav-header">Copy to a terminal</li>
         ${copy}
-      </ul></div>
+      </ul>`;
+  }
+
+  api.addRowMenu('git', { label: 'GIT', row: 0 }, ({ key, project: p, dir }: RowContext) => {
+    const projectPath = path.join(dir, p);
+    const { g, caption, title } = gitMenuState(projectPath);
+    if (lazy) return { html: gitButton(title), body: fragment(`menu/${encodeURIComponent(key)}/${encodeURIComponent(p)}`), caption };
+    return `<span class="act-with-status"><div class="uk-inline act-menu act-menu-git">
+      ${gitButton(title)}
+      <div uk-dropdown="mode: click; pos: bottom-right">${gitMenuBody(key, p, projectPath, g)}</div>
     </div><span class="act-status uk-text-meta">${esc(caption)}</span></span>`;
+  });
+
+  // The row menu's body, asked for as the menu opens.
+  api.addFragment(({ send, rest }: FragmentContext) => {
+    const m = /^menu\/([a-z0-9_-]+)\/([a-zA-Z0-9_-]+)$/.exec(rest);
+    if (!m || !NAME_RE.test(m[2])) return send('<ul class="uk-nav uk-dropdown-nav"><li class="uk-nav-header">No such menu.</li></ul>', 404);
+    const projectPath = path.join(workspaceDir(m[1]), m[2]);
+    let folder = false;
+    try { folder = fs.statSync(projectPath).isDirectory(); } catch (_) { /* answered below */ }
+    if (!folder) return send('<ul class="uk-nav uk-dropdown-nav"><li class="uk-nav-header">No such project.</li></ul>', 404);
+    return send(gitMenuBody(m[1], m[2], projectPath, gitMenuState(projectPath).g));
   });
 
   /** Start the session; if the same command's session is still open from last time, replace it. */

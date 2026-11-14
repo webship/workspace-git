@@ -24,6 +24,15 @@
   "workspacePlugin": {
     "name": "git",
     "label": "Git",
+    "suggests": [
+      [
+        "dev",
+        "test",
+        "sandboxes",
+        "projects",
+        "products"
+      ]
+    ],
     "commands": {
       "workspaces": [
         "dev",

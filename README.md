@@ -21,3 +21,8 @@ bash core/scripts/plugins.sh --install git
 ```
 
 The `workspacePlugin` block in `package.json` is the manifest the installer reads.
+
+## What it goes with
+
+The GIT menu is on every project row of whatever folders the workspace has. The command it ships, `cmd-tools-git-change-filemode-to-false.sh`, is placed only in `dev`, `test`, `sandboxes`, `projects`, `products`, so the manifest suggests one of them (`suggests`): `--require` and `--list` say whether the workspace has one, and nothing is added for you.
+

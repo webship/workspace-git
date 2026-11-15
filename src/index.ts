@@ -56,6 +56,12 @@ export function gitInitRefusal(dir: string): string {
 export const gitScreenCommand = (lingerTail: (label: string) => string, label: string, args: string[]) =>
   `GIT_TERMINAL_PROMPT=0 git --no-pager ${args.join(' ')}; ${lingerTail(label)}`;
 
+/** The AI items the installer places: agents in ai-agents/, skills in ai-skills/, commands in ai-commands/, prompts in ai-prompts/. */
+export const AGENTS: string[] = ['git-state-reader'];
+export const SKILLS: string[] = ['git-menu'];
+export const AI_COMMANDS: string[] = ['git-state'];
+export const PROMPTS: string[] = ['git-folder-report'];
+
 export function register(api: PluginApi): void {
   const { esc, workspaceDir, NAME_RE, hasOwnGit, gitWorktreeInfo, tildePath, lingerTail, startInScreen, screenStartedHtml, hostRunnerRequest } = api.lib as any;
   const post = (name: string) => `/actions/p/${api.name}/${name}`;

@@ -1,18 +1,41 @@
 name: ci
+
 on:
   push:
     branches: ['1.0.x']
   pull_request:
+    branches: ['1.0.x']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20: the lowest Node.js the base's engines field accepts (">=20").
+        # 24: the Node.js the dashboard runs on, which loads this plugin.
+        node: ['20', '24']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
         with:
-          node-version: '24'
-      # The typed api lives in a private repository of the same organisation.
-      - run: git config --global url."https://x-access-token:${{ secrets.WORKSPACE_PLUGINS_TOKEN || github.token }}@github.com/".insteadOf "https://github.com/"
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - name: every shell script parses
+        run: |
+          git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
+          echo "$(git ls-files '*.sh' | wc -l) shell script(s) parse"

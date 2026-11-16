@@ -114,10 +114,15 @@ test('a prompt is a line that says what it is for, then the whole launch command
   }
 });
 
+// The book's folder is a path, not an assistant: webship/webship-js-ai-agent, webship/webship-js-skills and
+// webship/ai-agents install the book in <root>/.claude/automated-functional-testing-recipes/ for every AI CLI (Codex,
+// Gemini and Copilot too). An item may give that folder; nothing else of one assistant.
+const BOOK_FOLDER = /(?:~\/)?\.claude\/automated-functional-testing-recipes\//g;
+
 test('the body of every item is plain Markdown: it names no tool or feature of one AI command-line assistant', () => {
   for (const f of ITEM_FILES.filter((x) => x.endsWith('.md'))) {
     // What is left once the default launch line of a prompt is taken out: the words an assistant is asked to follow.
-    const body = bodyOf(read(f)).replace(/^\s*claude --permission-mode bypassPermissions """\s*$/m, '');
+    const body = bodyOf(read(f)).replace(/^\s*claude --permission-mode bypassPermissions """\s*$/m, '').replace(BOOK_FOLDER, '');
     for (const m of body.matchAll(/\b(Bash|Read|Write|Edit|Grep|Glob|Task|Agent|Skill|TodoWrite|WebFetch) tool\b|\bsubagents?\b|bypassPermissions|\bClaude\b|\bclaude -p\b|\.claude\/|\bMCP\b|mcp__/g)) {
       assert.fail(`${f}: "${m[0]}" belongs to one AI assistant; the body is for any of them`);
     }
@@ -267,4 +272,56 @@ test('the frontmatter of every item is YAML a strict parser reads', () => {
     }
   }
   assert.ok(seen > 0, 'the items carry frontmatter');
+});
+
+// When the work touches automated functional testing, the items send the reader to the book Automated Functional
+// Testing Recipes first: every agent and skill carries the same section "The book", the tester and the scenarios
+// skill of a platform also name the chapters to start with, and a command or a prompt that runs the suite points to it.
+const BOOK_WHERE = [
+  '.claude/automated-functional-testing-recipes/',
+  '~/.claude/automated-functional-testing-recipes/',
+  'https://github.com/webship/webship-js-ai-agent/tree/2.0.x/automated-functional-testing-recipes',
+];
+test('the items point to the book Automated Functional Testing Recipes, and say where to find it, in order', () => {
+  const flat = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const inOrder = (f: string, text: string) => {
+    let at = -1;
+    for (const where of BOOK_WHERE) {
+      const next = text.indexOf(where, at + 1);
+      assert.ok(next > at, `${f} gives ${where}, after the place before it`);
+      at = next;
+    }
+  };
+  const platform = (manifest.ai.skills || []).some((s: string) => path.basename(s) === `${manifest.name}-scenarios`);
+  const sections = new Set<string>();
+  const chapters = new Set<string>();
+  for (const f of [...(manifest.ai.agents || []), ...(manifest.ai.skills || []).map((s: string) => `${s}/SKILL.md`)]) {
+    const src = read(f);
+    const start = src.indexOf('\n## The book\n');
+    assert.ok(start > 0, `${f} has the section "The book"`);
+    const rest = src.slice(start + 1);
+    const end = rest.indexOf('\n## ', 1);
+    const [base, startWith] = (end < 0 ? rest : rest.slice(0, end)).split('\n- **For ');
+    assert.ok(flat(base).includes('read the book *Automated Functional Testing Recipes* first.'), `${f} says to read the book first`);
+    inOrder(f, base);
+    assert.ok(flat(base).includes('Its `README.md` first, then the chapter that matches the task'), `${f} says how to read it`);
+    assert.ok(flat(base).includes('source of truth for step phrasing. When they differ from the book, follow them and say so.'), `${f} says what wins over the book`);
+    sections.add(flat(base));
+    const item = path.basename(f) === 'SKILL.md' ? path.basename(path.dirname(f)) : path.basename(f, '.md');
+    if (platform && [`${manifest.name}-tester`, `${manifest.name}-scenarios`].includes(item)) {
+      const named = (startWith || '').match(/`ch\d{2}-[a-z0-9-]+\.md`/g) || [];
+      assert.ok(named.length >= 2 && named.length <= 4, `${f} names two to four chapters to start with`);
+      chapters.add(named.join(' '));
+    } else {
+      assert.strictEqual(startWith, undefined, `${f}: only the tester and the scenarios skill of a platform name chapters`);
+    }
+  }
+  assert.strictEqual(sections.size, 1, 'the section is the same in every agent and skill');
+  assert.ok(chapters.size <= 1, 'the tester and the scenarios skill name the same chapters');
+  for (const f of [...(manifest.ai.commands || []), ...(manifest.ai.prompts || [])]) {
+    const src = read(f);
+    if (!src.includes('cmd-tools-testing.sh')) continue;
+    assert.ok(/the book \*?Automated Functional Testing Recipes/.test(flat(src)), `${f} runs the suite, so it points to the book`);
+    inOrder(f, src);
+  }
 });

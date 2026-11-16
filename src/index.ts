@@ -155,9 +155,10 @@ export function register(api: PluginApi): void {
     return started;
   }
 
-  /** The only thing the page shows: a toast at the top that opens the session. */
+  /** The only thing the page shows: the notice every command gets, with the link to its session on the
+   *  Screens page. That page shows the session's log also after it has ended; /terminal/<session> does not. */
   const openOutputToast = (label: string, projectName: string, session: string, reload = false) =>
-    `<div class="msg assistant flash-now"${reload ? ' data-reload-on-close="1"' : ''}><code>${esc(label)}</code> on <strong>${esc(projectName)}</strong> — <a href="/terminal/${encodeURIComponent(session)}" target="_blank" rel="noopener">open the output</a></div>`;
+    `<div class="msg assistant flash-now"${reload ? ' data-reload-on-close="1"' : ''}><code>${esc(label)}</code> on <strong>${esc(projectName)}</strong> — <a href="/screens?session=${encodeURIComponent(session)}">Open in Screens</a></div>`;
 
   api.addAction('run', async ({ form, send, workspace }: ActionContext) => {
     const act = GIT_RUN_ACTIONS[String(form.cmd || '')];

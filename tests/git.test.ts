@@ -93,7 +93,7 @@ test('the handler refuses anything outside its table, a bad name, and a folder w
   await calls.actions.run({ form: { cmd: 'status', projectName: 'plain' }, send, workspace: 'dev' });
   assert.strictEqual(status, 400); assert.match(out, /no \.git of its own/);
   await calls.actions.run({ form: { cmd: 'status', projectName: 'repo' }, send, workspace: 'dev' });
-  assert.strictEqual(status, 200); assert.match(out, /open the output/);
+  assert.strictEqual(status, 200); assert.match(out, /href="\/screens\?session=[^"]+">Open in Screens<\/a>/); assert.ok(!/\/terminal\//.test(out), 'the Screens page shows the log after the session ended; the terminal page does not');
   assert.strictEqual(calls.started[0].verb, 'git-status');
   assert.match(calls.started[0].cmdLine, /^GIT_TERMINAL_PROMPT=0 git --no-pager status; echo "git status finished/);
   assert.doesNotMatch(calls.started[0].cmdLine, /\$/);
@@ -123,7 +123,7 @@ test('a session still open from last time is stopped and replaced; the command l
   await calls.actions.run({ form: { cmd: 'log', projectName: 'repo' }, send: (h: string) => { out = h; }, workspace: 'dev' });
   assert.deepStrictEqual(calls.stopped, [['stop', { session: 's-1' }]]);
   assert.strictEqual(calls.started.length, 2);
-  assert.match(out, /open the output/);
+  assert.match(out, /href="\/screens\?session=[^"]+">Open in Screens<\/a>/); assert.ok(!/\/terminal\//.test(out), 'the Screens page shows the log after the session ended; the terminal page does not');
   assert.match(gitScreenCommand(lingerTail, 'git log', ['log']), /Press Enter to close this session/);
 });
 

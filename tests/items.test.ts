@@ -239,3 +239,32 @@ test('the items say container-based, name the plugin they come with, and carry n
   const readme = read('README.md');
   for (const name of [...AGENTS, ...SKILLS, ...AI_COMMANDS, ...PROMPTS]) assert.ok(readme.includes(name), `the README lists ${name}`);
 });
+
+// Other AI command-line assistants read the frontmatter with a strict YAML parser: a value such a parser
+// cannot read is lost there (the item arrives with an empty description). The default assistant is lenient,
+// so the items are held to the strict reading here.
+test('the frontmatter of every item is YAML a strict parser reads', () => {
+  const ai = JSON.parse(read('package.json')).workspacePlugin.ai || {};
+  const files: string[] = [...(ai.agents || []), ...(ai.commands || []), ...(ai.skills || []).map((s: string) => `${s}/SKILL.md`)];
+  let seen = 0;
+  for (const f of files) {
+    const head = frontmatter(read(f));
+    assert.ok(head, `${f} has frontmatter`);
+    for (const line of head.split('\n').slice(1)) {
+      const m = line.match(/^([A-Za-z][A-Za-z0-9_-]*):(?: (.*))?$/);
+      if (!m) {
+        assert.match(line, /^ +(- )?\S/, `${f}: "${line}" is neither a key nor a part of the key above it`);
+        continue;
+      }
+      const value = (m[2] || '').trim();
+      seen += 1;
+      if (value === '') continue; // a list follows
+      if (value.startsWith("'")) { assert.match(value, /^'(?:[^']|'')*'$/, `${f}: the value of ${m[1]} is not a closed single-quoted value`); continue; }
+      if (value.startsWith('"')) { assert.doesNotThrow(() => JSON.parse(value), `${f}: the value of ${m[1]} is not a closed double-quoted value`); continue; }
+      if (/^\[.*\]$/.test(value)) continue; // a list on one line
+      assert.doesNotMatch(value, /: |:$| #/, `${f}: the value of ${m[1]} holds ": " or " #". A strict YAML parser stops there, and the assistant that uses one gets no ${m[1]}: reword it, or quote the value`);
+      assert.doesNotMatch(value, /^(?:[[\]{}>|*&!%@\`#,]|[-?:] )/, `${f}: the value of ${m[1]} starts with a sign YAML keeps for itself: quote the value`);
+    }
+  }
+  assert.ok(seen > 0, 'the items carry frontmatter');
+});

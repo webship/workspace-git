@@ -39,3 +39,9 @@ jobs:
         run: |
           git ls-files -z '*.sh' | xargs -0 -r -n1 bash -n
           echo "$(git ls-files '*.sh' | wc -l) shell script(s) parse"
+
+  # The plugin's webship-js features against a dashboard with this plugin installed (packed from this
+  # checkout), started in the job: no DDEV, no account. The workflow lives in webship/workspace.
+  browser:
+    name: webship-js features
+    uses: webship/workspace/.github/workflows/plugin-browser-suite.yml@1.0.x

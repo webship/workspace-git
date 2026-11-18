@@ -161,7 +161,10 @@ export function register(api: PluginApi): void {
     `<div class="msg assistant flash-now"${reload ? ' data-reload-on-close="1"' : ''}><code>${esc(label)}</code> on <strong>${esc(projectName)}</strong> — <a href="/screens?session=${encodeURIComponent(session)}">Open in Screens</a></div>`;
 
   api.addAction('run', async ({ form, send, workspace }: ActionContext) => {
-    const act = GIT_RUN_ACTIONS[String(form.cmd || '')];
+    // Only the table's own entries: `constructor`, `toString` or `__proto__` are found on every object, and
+    // taking one for a command threw on its `args` and ended the dashboard with it.
+    const cmd = String(form.cmd || '');
+    const act = Object.prototype.hasOwnProperty.call(GIT_RUN_ACTIONS, cmd) ? GIT_RUN_ACTIONS[cmd] : undefined;
     if (!act) return send('<div class="msg error">Unknown git command.</div>', 404);
     const projectName = String(form.projectName || '');
     if (!NAME_RE.test(projectName)) return send('<div class="msg error">Invalid project name.</div>', 400);

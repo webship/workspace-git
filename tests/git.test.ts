@@ -88,6 +88,12 @@ test('the handler refuses anything outside its table, a bad name, and a folder w
   const send = (h: string, s = 200) => { out = h; status = s; };
   await calls.actions.run({ form: { cmd: 'push', projectName: 'repo' }, send, workspace: 'dev' });
   assert.strictEqual(status, 404);
+  // A name every object has is not a command: refused like any other, never thrown on.
+  for (const cmd of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+    await calls.actions.run({ form: { cmd, projectName: 'repo' }, send, workspace: 'dev' });
+    assert.strictEqual(status, 404, cmd);
+    assert.match(out, /Unknown git command/);
+  }
   await calls.actions.run({ form: { cmd: 'status', projectName: '../x' }, send, workspace: 'dev' });
   assert.strictEqual(status, 400);
   await calls.actions.run({ form: { cmd: 'status', projectName: 'plain' }, send, workspace: 'dev' });
